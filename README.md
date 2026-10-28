@@ -34,6 +34,7 @@ webcam frame ─► detector.py ─► posture.py ─► coach.py ─► storage
 | `storage.py` | Writes one CSV row per second to `data/logs/YYYY-MM-DD.csv`. |
 | `app.py` | Opens the webcam, draws the overlay and wires everything together. |
 | `report.py` | Reads the CSV logs with pandas and answers: where did my time go, and *when* do I lose focus? |
+| `dashboard.py` | Streamlit web page over the same report: date range, hover tooltips, table view. |
 | `sample_data.py` | Makes a realistic fake work week, for demos and the charts below. |
 | `chart_style.py` | One colour-blind-safe palette; each state keeps its colour in every chart. |
 
@@ -101,6 +102,19 @@ minute can't look like a "100% bad" hour.
 ![Good posture by state](docs/images/breakdown.png)
 ![Good posture trend over the week](docs/images/trend.png)
 
+## Dashboard
+
+The same report as an interactive web page: pick a date range, hover any bar
+or point for exact numbers, and open the day-by-day table.
+
+```bash
+streamlit run dashboard.py
+```
+
+It has no analysis code of its own: every number comes from the functions in
+`report.py`, so the terminal report and the dashboard can never disagree.
+Switch **Data** to *Demo week* to try it before you have logs of your own.
+
 ## Tests
 
 The posture rules, the coach timing and the report maths are tested with
@@ -115,5 +129,5 @@ python -m unittest discover -s tests -t .
 - [x] Live posture, distance, tilt and phone detection with alerts
 - [x] Break reminders and per-second CSV logging
 - [x] Daily report: when in the day do you lose focus?
-- [ ] Streamlit dashboard with weekly trends
+- [x] Streamlit dashboard with weekly trends
 - [ ] Pomodoro mode that pauses when you leave your desk

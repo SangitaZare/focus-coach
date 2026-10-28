@@ -72,22 +72,27 @@ def longest_streak_minutes(df: pd.DataFrame, state: State = State.GOOD) -> float
     return _runs(df).loc[rows.index].value_counts().max() / 60
 
 
+def summarize(df: pd.DataFrame) -> dict:
+    """Desk minutes, % of desk time in each state, pickups and alerts, for any rows.
+
+    Works on one day or a whole week: the dashboard passes a date range.
+    """
+    desk = df[df["state"] != State.AWAY.value]
+    seconds = desk["state"].value_counts()
+    total = len(desk)
+    row = {"desk_min": total / 60,
+           "away_min": (df["state"] == State.AWAY.value).sum() / 60}
+    for s in DESK_STATES:
+        row[f"{s.value}_pct"] = 100 * seconds.get(s.value, 0) / total if total else 0.0
+    row["phone_pickups"] = phone_pickups(df)
+    row["best_focus_min"] = longest_streak_minutes(df)
+    row["alerts"] = int((df["alert"] != "").sum())
+    return row
+
+
 def daily_summary(df: pd.DataFrame) -> pd.DataFrame:
-    """One row per day: desk minutes, % of desk time in each state, pickups, alerts."""
-    rows = []
-    for day, part in df.groupby("date"):
-        desk = part[part["state"] != State.AWAY.value]
-        seconds = desk["state"].value_counts()
-        total = len(desk)
-        row = {"date": day,
-               "desk_min": total / 60,
-               "away_min": (part["state"] == State.AWAY.value).sum() / 60}
-        for s in DESK_STATES:
-            row[f"{s.value}_pct"] = 100 * seconds.get(s.value, 0) / total if total else 0.0
-        row["phone_pickups"] = phone_pickups(part)
-        row["best_focus_min"] = longest_streak_minutes(part)
-        row["alerts"] = int((part["alert"] != "").sum())
-        rows.append(row)
+    """One summarize() row per day."""
+    rows = [{"date": day, **summarize(part)} for day, part in df.groupby("date")]
     return pd.DataFrame(rows).set_index("date") if rows else pd.DataFrame()
 
 
