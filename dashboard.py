@@ -181,5 +181,5 @@ with st.expander("Day-by-day numbers"):
         "desk_min": "Desk min", "away_min": "Away min",
         **{f"{s.value}_pct": f"{cs.STATE_LABELS[s]} %" for s in DESK_STATES},
         "phone_pickups": "Phone pickups", "best_focus_min": "Longest good (min)",
-        "alerts": "Alerts"})
+        "alerts": "Alerts", "pomodoros": "Pomodoros"})
     st.dataframe(table.round(1), width="stretch")

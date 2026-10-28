@@ -61,6 +61,15 @@ class SummaryTests(unittest.TestCase):
         self.assertAlmostEqual(row["slouch_pct"], 25.0)
         self.assertAlmostEqual(row["phone_pct"], 0.0)
 
+    def test_pomodoros_are_counted_but_not_as_alerts(self):
+        df = log(("good", 10))
+        df.loc[2, "alert"] = "slouch"
+        df.loc[5, "alert"] = "pomodoro_done;phone"
+        df.loc[8, "alert"] = "pomodoro_stand_up"
+        row = daily_summary(df).iloc[0]
+        self.assertEqual(row["pomodoros"], 1)
+        self.assertEqual(row["alerts"], 2)       # slouch + phone
+
 
 class HourlyTests(unittest.TestCase):
     def test_percent_of_each_hours_desk_time(self):

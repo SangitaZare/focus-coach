@@ -20,6 +20,7 @@ import pandas as pd
 from matplotlib.ticker import PercentFormatter
 
 import chart_style as cs
+from pomodoro import DONE as POMODORO_DONE
 from posture import State
 from storage import LOG_DIR
 
@@ -86,7 +87,11 @@ def summarize(df: pd.DataFrame) -> dict:
         row[f"{s.value}_pct"] = 100 * seconds.get(s.value, 0) / total if total else 0.0
     row["phone_pickups"] = phone_pickups(df)
     row["best_focus_min"] = longest_streak_minutes(df)
-    row["alerts"] = int((df["alert"] != "").sum())
+    # One row can hold several alerts ("slouch;pomodoro_done"), so split them.
+    kinds = df["alert"].str.split(";").explode()
+    kinds = kinds[kinds != ""]
+    row["pomodoros"] = int((kinds == POMODORO_DONE).sum())
+    row["alerts"] = int((~kinds.str.startswith("pomodoro")).sum())   # posture/phone only
     return row
 
 
@@ -208,6 +213,8 @@ def print_summary(summary: pd.DataFrame, hourly: pd.DataFrame) -> None:
         print(f"{'Phone pickups':<24}{row['phone_pickups']:6.0f}")
         print(f"{'Longest good stretch':<24}{row['best_focus_min']:6.0f} min")
         print(f"{'Alerts':<24}{row['alerts']:6.0f}")
+        if row["pomodoros"]:
+            print(f"{'Pomodoros completed':<24}{row['pomodoros']:6.0f}")
     worst = worst_hour(hourly)
     if worst is not None:
         print(f"\nYou lose focus most around {hour_label(worst)} "

@@ -8,6 +8,8 @@ A webcam app that watches how you sit while you work and nudges you when you:
 - **pick up your phone**
 - **sit too long** without a break (50 minutes by default)
 
+Optional **Pomodoro mode** that uses the camera to keep you honest (see below).
+
 Every second is saved to a CSV file on your own computer, so you can see
 your habits over days and weeks. Nothing is uploaded anywhere.
 
@@ -33,6 +35,7 @@ webcam frame ─► detector.py ─► posture.py ─► coach.py ─► storage
 | `coach.py` | Smooths out flickering frames, times each bad habit and decides when to alert, with a cooldown so it doesn't nag. |
 | `storage.py` | Writes one CSV row per second to `data/logs/YYYY-MM-DD.csv`. |
 | `app.py` | Opens the webcam, draws the overlay and wires everything together. |
+| `pomodoro.py` | Optional Pomodoro timer: pauses when you leave, nudges you if you skip the break. Pure logic, tested with a fake clock. |
 | `report.py` | Reads the CSV logs with pandas and answers: where did my time go, and *when* do I lose focus? |
 | `dashboard.py` | Streamlit web page over the same report: date range, hover tooltips, table view. |
 | `sample_data.py` | Makes a realistic fake work week, for demos and the charts below. |
@@ -73,6 +76,27 @@ The two models (about 6 MB each) download automatically on first run.
 
 **Tips:** put the camera at about eye level, facing you, with your head and
 both shoulders in view. Sit up straight while it calibrates.
+
+## Pomodoro mode
+
+The Pomodoro technique: focus 25 minutes, break 5, and every 4th break is
+15 minutes. Ordinary timers have two problems: they keep counting while you
+fetch water, and they can't tell if you actually took the break. This one
+watches:
+
+| Phase | What happens |
+|---|---|
+| **Focus** | Counts only while you're at the desk. Leave and it shows *Paused – away*; it carries on when you're back. |
+| **Break** | Counts down. Still sitting after 20 seconds? It nudges you every minute: *stand up and stretch*. |
+| **Ready** | Break over. The next round starts the moment you sit down, so you never return to a timer already running. |
+
+```bash
+python app.py --pomodoro                     # 25 / 5
+python app.py --pomodoro --focus 50 --break 10
+```
+
+In Pomodoro mode the timer replaces the 50-minute "sitting too long" reminder.
+Completed Pomodoros appear in the report and dashboard.
 
 ## Daily report
 
@@ -130,4 +154,4 @@ python -m unittest discover -s tests -t .
 - [x] Break reminders and per-second CSV logging
 - [x] Daily report: when in the day do you lose focus?
 - [x] Streamlit dashboard with weekly trends
-- [ ] Pomodoro mode that pauses when you leave your desk
+- [x] Pomodoro mode that pauses when you leave your desk

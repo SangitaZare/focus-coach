@@ -1,6 +1,7 @@
 """Focus Coach: run this file to start.
 
-    python app.py              use your webcam
+    python app.py                use your webcam
+    python app.py --pomodoro     add a 25/5 Pomodoro timer that pauses when you leave
     python app.py --video x.mp4  test on a recorded video instead
 
 Keys while running:  c = recalibrate   q or Esc = quit
@@ -9,6 +10,8 @@ This file only wires the pieces together and draws on screen:
 
     webcam frame -> detector.py -> posture.py -> coach.py -> storage.py
                       (what's there)  (good/bad?)   (alert now?)  (save to CSV)
+                                                       |
+                                                  pomodoro.py (optional)
 """
 import argparse
 import time
@@ -19,6 +22,7 @@ import numpy as np
 
 from coach import Alert, Coach
 from detector import Detector, Observation
+from pomodoro import Phase, Pomodoro
 from posture import Baseline, State, frame_state, make_baseline, measure
 from storage import SessionLog
 
@@ -57,9 +61,12 @@ def beep() -> None:
 
 # ---- drawing -----------------------------------------------------------
 
-def put_text(img, text, org, scale=0.6, colour=WHITE, thickness=1):
-    # Draw a dark outline first so the text is readable on any background.
-    cv2.putText(img, text, org, FONT, scale, BLACK, thickness + 3, cv2.LINE_AA)
+def put_text(img, text, org, scale=0.6, colour=WHITE, thickness=1, outline=True):
+    # On the raw video, draw a dark outline first so the text is readable on
+    # any background. On our own solid bars it isn't needed, and at small
+    # sizes it smears the letters, so those pass outline=False.
+    if outline:
+        cv2.putText(img, text, org, FONT, scale, BLACK, thickness + 2, cv2.LINE_AA)
     cv2.putText(img, text, org, FONT, scale, colour, thickness, cv2.LINE_AA)
 
 
@@ -84,7 +91,7 @@ def draw_body(img, obs: Observation) -> None:
 
 def draw_banner(img, text, colour) -> None:
     cv2.rectangle(img, (0, 0), (img.shape[1], 40), colour, -1)
-    put_text(img, text, (12, 28), 0.75, WHITE, 2)
+    put_text(img, text, (12, 28), 0.75, WHITE, 2, outline=False)
 
 
 def draw_stats(img, coach: Coach, now: float, session_start: float) -> None:
@@ -102,21 +109,37 @@ def draw_stats(img, coach: Coach, now: float, session_start: float) -> None:
     top = y - 18
     img[top:, :200] = (img[top:, :200] * 0.45).astype(img.dtype)
     for line in lines:
-        put_text(img, line, (12, y), 0.5)
+        put_text(img, line, (12, y), 0.5, outline=False)
         y += 18
+
+
+def draw_pomodoro(img, timer: Pomodoro, now: float) -> None:
+    """A second bar under the banner: timer text and a progress line."""
+    w = img.shape[1]
+    colour = {Phase.FOCUS: (120, 60, 20), Phase.BREAK: (60, 110, 30),
+              Phase.READY: (90, 90, 90)}[timer.phase]
+    if timer.phase is Phase.FOCUS and timer.paused:
+        colour = (90, 90, 90)
+    cv2.rectangle(img, (0, 40), (w, 68), colour, -1)
+    put_text(img, timer.status(now), (12, 60), 0.55, outline=False)
+    cv2.rectangle(img, (0, 66), (int(w * min(timer.progress(now), 1.0)), 68), WHITE, -1)
 
 
 def draw_alert(img, alert: Alert) -> None:
     h, w = img.shape[:2]
-    (tw, th), _ = cv2.getTextSize(alert.message, FONT, 0.8, 2)
+    scale = 0.8
+    (tw, th), _ = cv2.getTextSize(alert.message, FONT, scale, 2)
+    if tw > w - 48:                       # shrink long messages to fit the window
+        scale *= (w - 48) / tw
+        (tw, th), _ = cv2.getTextSize(alert.message, FONT, scale, 2)
     x, y = (w - tw) // 2, h // 2
     cv2.rectangle(img, (x - 16, y - th - 16), (x + tw + 16, y + 16), (40, 40, 40), -1)
-    put_text(img, alert.message, (x, y), 0.8, (0, 220, 255), 2)
+    put_text(img, alert.message, (x, y), scale, (0, 220, 255), 2, outline=False)
 
 
 # ---- main loop ---------------------------------------------------------
 
-def run(source: int | str) -> None:
+def run(source: int | str, timer: Pomodoro | None = None) -> None:
     print("Loading models (the first run downloads them, ~10 MB)...")
     detector = Detector()
     # The first couple of predictions are slow (one-time setup inside PyTorch),
@@ -129,6 +152,8 @@ def run(source: int | str) -> None:
                          "Is another app (Zoom, Teams) using the webcam?")
 
     coach = Coach()
+    if timer:
+        coach.break_after = float("inf")   # the Pomodoro timer handles breaks instead
     baseline: Baseline | None = None
     # The countdown starts on the first processed frame, not here: the
     # first frame is slow while the models warm up.
@@ -166,6 +191,10 @@ def run(source: int | str) -> None:
                 state = frame_state(obs.person_found, bool(obs.phone_boxes), m, baseline)
                 if state is not None:
                     alerts = coach.update(state, now)
+                    if timer:
+                        # Use the coach's smoothed state, so one missed frame
+                        # doesn't count as leaving the desk.
+                        alerts += timer.update(coach.state, now)
                     log.record(datetime.now(), coach.state.value, [a.kind for a in alerts])
                     if alerts:
                         shown_alert = alerts[-1]
@@ -173,6 +202,8 @@ def run(source: int | str) -> None:
                 shown = coach.state or State.GOOD
                 draw_banner(frame, f"{LABELS[shown]}  ({coach.state_duration(now):.0f}s)",
                             COLOURS[shown])
+                if timer:
+                    draw_pomodoro(frame, timer, now)
                 draw_stats(frame, coach, now, session_start)
                 if shown_alert and now - shown_alert.at < ALERT_SHOW_SECONDS:
                     draw_alert(frame, shown_alert)
@@ -186,10 +217,10 @@ def run(source: int | str) -> None:
 
     capture.release()
     cv2.destroyAllWindows()
-    print_summary(coach)
+    print_summary(coach, timer)
 
 
-def print_summary(coach: Coach) -> None:
+def print_summary(coach: Coach, timer: Pomodoro | None = None) -> None:
     total = sum(coach.seconds_in.values())
     if not total:
         print("No session recorded.")
@@ -201,6 +232,8 @@ def print_summary(coach: Coach) -> None:
         if secs:
             print(f"{LABELS[state]:<22}{secs / 60:5.1f} min  {100 * secs / total:3.0f}%")
     print(f"{'Phone pickups':<22}{coach.phone_pickups:5d}")
+    if timer:
+        print(f"{'Pomodoros completed':<22}{timer.completed:5d}")
     print("Saved second-by-second to data/logs/ - run `python report.py` for charts.")
 
 
@@ -208,8 +241,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Webcam posture and focus coach")
     parser.add_argument("--camera", type=int, default=0, help="webcam number (default 0)")
     parser.add_argument("--video", help="use a video file instead of the webcam")
+    parser.add_argument("--pomodoro", action="store_true",
+                        help="Pomodoro timer that pauses when you leave the desk")
+    parser.add_argument("--focus", type=float, default=25, help="focus minutes (default 25)")
+    parser.add_argument("--break", dest="break_min", type=float, default=5,
+                        help="short break minutes (default 5; every 4th break is 15)")
     args = parser.parse_args()
-    run(args.video if args.video else args.camera)
+    timer = Pomodoro(focus_min=args.focus, short_break_min=args.break_min) if args.pomodoro else None
+    run(args.video if args.video else args.camera, timer)
 
 
 if __name__ == "__main__":
