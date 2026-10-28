@@ -1,0 +1,5 @@
+# For a smaller, CPU-only PyTorch install (no NVIDIA GPU needed), run first:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+ultralytics==8.4.191
+opencv-python==5.0.0.93
+numpy==2.5.2
