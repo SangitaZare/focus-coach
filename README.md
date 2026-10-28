@@ -33,6 +33,9 @@ webcam frame ─► detector.py ─► posture.py ─► coach.py ─► storage
 | `coach.py` | Smooths out flickering frames, times each bad habit and decides when to alert, with a cooldown so it doesn't nag. |
 | `storage.py` | Writes one CSV row per second to `data/logs/YYYY-MM-DD.csv`. |
 | `app.py` | Opens the webcam, draws the overlay and wires everything together. |
+| `report.py` | Reads the CSV logs with pandas and answers: where did my time go, and *when* do I lose focus? |
+| `sample_data.py` | Makes a realistic fake work week, for demos and the charts below. |
+| `chart_style.py` | One colour-blind-safe palette; each state keeps its colour in every chart. |
 
 ### Why calibrate?
 
@@ -70,10 +73,38 @@ The two models (about 6 MB each) download automatically on first run.
 **Tips:** put the camera at about eye level, facing you, with your head and
 both shoulders in view. Sit up straight while it calibrates.
 
+## Daily report
+
+Live alerts fix the moment; the report shows the pattern. Most posture apps
+stop at alerts. This one tells you **which hours of the day** you lose focus,
+so you can plan around them, e.g. a walk at 4 pm or the phone in another room
+after 5.
+
+```bash
+python report.py                    # all your saved days
+python report.py --day 2026-10-28   # one day
+python report.py --demo             # a made-up week, to try it out
+```
+
+It prints a summary per day (desk time, % in each state, phone pickups,
+longest good stretch, alerts) and saves charts to `reports/`.
+
+The charts below come from the made-up demo week, not real data:
+
+![When in the day focus drops](docs/images/hourly.png)
+
+The hourly chart uses **% of that hour's desk time**, not minutes. You'd have
+more slouching *minutes* in any hour you work more; percent shows which hours
+are truly worse. Hours with under 5 minutes of data are left out so one bad
+minute can't look like a "100% bad" hour.
+
+![Good posture by state](docs/images/breakdown.png)
+![Good posture trend over the week](docs/images/trend.png)
+
 ## Tests
 
-The posture rules and the coach timing are tested with made-up keypoints and
-a fake clock, so no camera is needed:
+The posture rules, the coach timing and the report maths are tested with
+made-up keypoints, a fake clock and hand-made logs, so no camera is needed:
 
 ```bash
 python -m unittest discover -s tests -t .
@@ -83,6 +114,6 @@ python -m unittest discover -s tests -t .
 
 - [x] Live posture, distance, tilt and phone detection with alerts
 - [x] Break reminders and per-second CSV logging
-- [ ] Daily report: when in the day do you lose focus?
+- [x] Daily report: when in the day do you lose focus?
 - [ ] Streamlit dashboard with weekly trends
 - [ ] Pomodoro mode that pauses when you leave your desk

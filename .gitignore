@@ -8,3 +8,7 @@ __pycache__/
 
 # Your personal posture logs stay on your computer
 data/
+
+# Your personal report charts
+reports/
+.scratch/

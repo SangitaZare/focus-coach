@@ -201,7 +201,7 @@ def print_summary(coach: Coach) -> None:
         if secs:
             print(f"{LABELS[state]:<22}{secs / 60:5.1f} min  {100 * secs / total:3.0f}%")
     print(f"{'Phone pickups':<22}{coach.phone_pickups:5d}")
-    print("Saved second-by-second to data/logs/")
+    print("Saved second-by-second to data/logs/ - run `python report.py` for charts.")
 
 
 def main() -> None:
