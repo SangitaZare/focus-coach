@@ -1,5 +1,9 @@
 # Focus Coach
 
+[![tests](https://github.com/SangitaZare/focus-coach/actions/workflows/tests.yml/badge.svg)](https://github.com/SangitaZare/focus-coach/actions/workflows/tests.yml)
+![Python 3.14](https://img.shields.io/badge/python-3.14-blue)
+![YOLO11](https://img.shields.io/badge/model-YOLO11%20pose%20%2B%20detect-purple)
+
 A webcam app that watches how you sit while you work and nudges you when you:
 
 - **slouch** (your head sinks towards your shoulders)
@@ -148,6 +152,38 @@ made-up keypoints, a fake clock and hand-made logs, so no camera is needed:
 python -m unittest discover -s tests -t .
 ```
 
+The same tests run on GitHub on every push (the badge at the top). They need
+only pandas and matplotlib, not PyTorch: keeping the AI in `detector.py` and
+everything else as plain logic is what makes that possible.
+
+## Limitations
+
+Knowing where it fails matters as much as knowing where it works.
+
+- **Front view only.** A webcam sees you from the front, so it can't measure
+  spine angle. It uses clues (head height above the shoulders, shoulder
+  width, eye-line tilt) that change when you slouch. Slouching that keeps
+  your head level, like sliding down in the chair, can be missed.
+- **Head and both shoulders must be in view.** If you sit very close, your
+  shoulders can leave the frame. Those frames are skipped, not guessed.
+- **Thresholds are hand-tuned, not measured.** The 80% / 125% / 12° limits
+  were set by trying them, not by testing against labelled recordings, so
+  there's no accuracy figure yet. Measuring that is the next step.
+- **Phone detection depends on the phone being visible.** The general YOLO
+  model knows "cell phone" from everyday photos. A phone held flat below the
+  desk, or mostly hidden by a hand, is often missed; a TV remote is
+  sometimes mistaken for one. Smoothing and the 15-second wait hide most
+  single-frame mistakes.
+- **One person.** With several people in view it coaches the largest (the
+  closest to the camera).
+- **Lighting.** Dim or strong back light (a window behind you) lowers keypoint
+  confidence, and more frames are skipped.
+- **Speed.** About 5–6 frames per second on a laptop CPU with both models.
+  That's plenty for posture, which changes over seconds, but it isn't
+  smooth video.
+- **Calibration is per session.** If you move the laptop or camera, press
+  `c` to recalibrate, or the comparisons will be off.
+
 ## Roadmap
 
 - [x] Live posture, distance, tilt and phone detection with alerts
@@ -155,3 +191,6 @@ python -m unittest discover -s tests -t .
 - [x] Daily report: when in the day do you lose focus?
 - [x] Streamlit dashboard with weekly trends
 - [x] Pomodoro mode that pauses when you leave your desk
+- [x] Tests run automatically on GitHub (CI)
+- [ ] Demo GIF of the live app
+- [ ] Accuracy check: record labelled sessions and measure how often each state is detected correctly
